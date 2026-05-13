@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   backend-app:
     image: ${DOCKER_USER}/innovatech-backend:latest
