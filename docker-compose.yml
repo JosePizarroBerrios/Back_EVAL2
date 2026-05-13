@@ -8,9 +8,9 @@ services:
       - "3000:3000"
     environment:
       - DB_HOST=${DB_HOST_PRIVATE_IP}
-      - DB_USER=mysql
+      - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=innovatech_db
+      - DB_NAME=proyecto_db
     networks:
       - deploy-net
 
