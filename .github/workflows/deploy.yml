@@ -19,14 +19,17 @@ jobs:
       - name: SSH Deploy (via Bastion)
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}
-          proxy_host: ${{ secrets.BASTION_HOST }}
+          host: ${{ secrets.EC2_HOST }}           # IP Privada del Backend
           username: ec2-user
           key: ${{ secrets.SSH_KEY }}
+          proxy_host: ${{ secrets.BASTION_HOST }} # IP Pública del Frontend
+          proxy_username: ec2-user                # Obligatorio para el primer salto
+          proxy_key: ${{ secrets.SSH_KEY }}       # La misma llave para ambos
           script: |
             mkdir -p ~/app && cd ~/app
-            export DOCKER_USER=${{ secrets.DOCKER_USER }}
-            export DB_HOST_PRIVATE_IP=${{ secrets.DB_HOST_PRIVATE_IP }}
-            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            # Crear archivo .env para que docker-compose lo lea realmente
+            echo "DOCKER_USER=${{ secrets.DOCKER_USER }}" > .env
+            echo "DB_HOST_PRIVATE_IP=${{ secrets.DB_HOST_PRIVATE_IP }}" >> .env
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
             docker-compose pull
             docker-compose up -d --build
