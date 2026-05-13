@@ -2,21 +2,25 @@ name: Deploy Backend
 on:
   push:
     branches: [ "deploy" ]
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Docker Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
+
       - name: Build and Push
         run: |
           docker build -t ${{ secrets.DOCKER_USER }}/innovatech-backend:latest .
           docker push ${{ secrets.DOCKER_USER }}/innovatech-backend:latest
-            - name: Copy docker-compose to Backend
+
+      - name: Copy docker-compose to Backend
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -27,18 +31,18 @@ jobs:
           proxy_key: ${{ secrets.SSH_KEY }}
           source: "docker-compose.yml"
           target: "~/app"
+
       - name: SSH Deploy (via Bastion)
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}           # IP Privada del Backend
+          host: ${{ secrets.EC2_HOST }}
+          proxy_host: ${{ secrets.BASTION_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_KEY }}
-          proxy_host: ${{ secrets.BASTION_HOST }} # IP Pública del Frontend
-          proxy_username: ec2-user                # Obligatorio para el primer salto
-          proxy_key: ${{ secrets.SSH_KEY }}       # La misma llave para ambos
+          proxy_username: ec2-user
+          proxy_key: ${{ secrets.SSH_KEY }}
           script: |
             mkdir -p ~/app && cd ~/app
-            # Crear archivo .env para que docker-compose lo lea realmente
             echo "DOCKER_USER=${{ secrets.DOCKER_USER }}" > .env
             echo "DB_HOST_PRIVATE_IP=${{ secrets.DB_HOST_PRIVATE_IP }}" >> .env
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
