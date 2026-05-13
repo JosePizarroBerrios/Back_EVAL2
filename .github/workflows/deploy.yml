@@ -1,4 +1,5 @@
 name: Deploy Backend
+
 on:
   push:
     branches: [ "deploy" ]
@@ -20,31 +21,44 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USER }}/innovatech-backend:latest .
           docker push ${{ secrets.DOCKER_USER }}/innovatech-backend:latest
 
-      - name: Copy docker-compose to Backend
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          proxy_host: ${{ secrets.BASTION_HOST }}
-          username: ec2-user
-          key: ${{ secrets.SSH_KEY }}
-          proxy_username: ec2-user
-          proxy_key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "~/app"
-
-      - name: SSH Deploy (via Bastion)
+      - name: SSH Deploy (via Bastion Jump)
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}
-          proxy_host: ${{ secrets.BASTION_HOST }}
+          host: ${{ secrets.BASTION_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_KEY }}
-          proxy_username: ec2-user
-          proxy_key: ${{ secrets.SSH_KEY }}
           script: |
-            mkdir -p ~/app && cd ~/app
-            echo "DOCKER_USER=${{ secrets.DOCKER_USER }}" > .env
-            echo "DB_HOST_PRIVATE_IP=${{ secrets.DB_HOST_PRIVATE_IP }}" >> .env
-            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-            docker-compose pull
-            docker-compose up -d --build
+            # 1. Crear la llave temporal dentro del Bastion para poder saltar al Backend
+            echo "${{ secrets.SSH_KEY }}" > private_key.pem
+            chmod 600 private_key.pem
+
+            # 2. Ejecutar comandos en el Backend desde el Bastion
+            ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.BACKEND_IP_PRIVADA }} << 'INNER_EOF'
+              mkdir -p ~/app && cd ~/app
+
+              # Crear el docker-compose.yml directamente en el Backend
+              cat <<EOF > docker-compose.yml
+              version: '3.8'
+              services:
+                backend-app:
+                  image: ${{ secrets.DOCKER_USER }}/innovatech-backend:latest
+                  container_name: backend_service
+                  restart: always
+                  ports:
+                    - "3000:3000"
+                  environment:
+                    - DB_HOST=${{ secrets.DB_HOST_PRIVATE_IP }}
+                    - DB_USER=root
+                    - DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+                    - DB_NAME=proyecto_db
+              EOF
+
+              # Login en Docker dentro del Backend privado
+              echo "${{ secrets.DOCKER_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+              
+              sudo docker-compose pull
+              sudo docker-compose up -d
+            INNER_EOF
+
+            # 3. Limpiar la llave del Bastion por seguridad
+            rm private_key.pem
