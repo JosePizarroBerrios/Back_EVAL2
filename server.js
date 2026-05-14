@@ -15,7 +15,7 @@ app.use(express.json());
 // Configuración de la conexión a la base de datos MySQL
 const dbConnection = mysql.createConnection({
     host: process.env.DB_HOST,
-    user: process.env.DB_USER || 'root',
+    user: process.env.DB_USER || 'user1',
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'proyecto_db',
     port: process.env.DB_PORT || 3306
